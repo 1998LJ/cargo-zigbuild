@@ -25,6 +25,15 @@ use super::wrapper::{
 };
 use super::{Zig, has_system_dlltool};
 
+fn macos_deployment_target(target: &str) -> Option<&str> {
+    let (rust_target, deployment_target) = target.split_once('.')?;
+    if rust_target.ends_with("-apple-darwin") && !deployment_target.is_empty() {
+        Some(deployment_target)
+    } else {
+        None
+    }
+}
+
 impl Zig {
     fn add_env_if_missing<K, V>(command: &mut Command, name: K, value: V)
     where
@@ -71,6 +80,13 @@ impl Zig {
                 "warning: failed to raise the open file limit: {err}; large builds may fail with ProcessFdQuotaExceeded (try `ulimit -n 65536`)"
             );
         }
+        if let Some(deployment_target) = raw_targets
+            .iter()
+            .find_map(|target| macos_deployment_target(target))
+        {
+            cmd.env("MACOSX_DEPLOYMENT_TARGET", deployment_target);
+        }
+
         let rust_targets = raw_targets
             .iter()
             .map(|target| target.split_once('.').map(|(t, _)| t).unwrap_or(target))
@@ -742,4 +758,26 @@ pub(crate) fn write_tbd_files(deps_dir: &Path) -> Result<(), anyhow::Error> {
     write_file(&deps_dir.join("libcharset.1.tbd"), LIBCHARSET_TBD)?;
     write_file(&deps_dir.join("libcharset.tbd"), LIBCHARSET_TBD)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::macos_deployment_target;
+
+    #[test]
+    fn test_macos_deployment_target() {
+        assert_eq!(
+            macos_deployment_target("aarch64-apple-darwin.13.0"),
+            Some("13.0")
+        );
+        assert_eq!(
+            macos_deployment_target("x86_64-apple-darwin.10.15"),
+            Some("10.15")
+        );
+        assert_eq!(macos_deployment_target("aarch64-apple-darwin"), None);
+        assert_eq!(
+            macos_deployment_target("x86_64-unknown-linux-gnu.2.28"),
+            None
+        );
+    }
 }

@@ -583,12 +583,14 @@ fn zig_target_triple(
             format!("{zig_arch}-linux-{zig_target_env}{abi_suffix}")
         }
         OperatingSystem::MacOSX { .. } | OperatingSystem::Darwin(_) => {
-            // Zig 0.10.0 switched macOS ABI to none
-            // see https://github.com/ziglang/zig/pull/11684
+            // Zig 0.10.0 switched macOS ABI to none.
+            // Apple deployment versions belong after the OS, before the ABI:
+            // e.g. aarch64-macos.13.0-none.
+            // See https://github.com/ziglang/zig/pull/11684.
             if *zig_version > semver::Version::new(0, 9, 1) {
-                format!("{arch}-macos-none{abi_suffix}")
+                format!("{arch}-macos{abi_suffix}-none")
             } else {
-                format!("{arch}-macos-gnu{abi_suffix}")
+                format!("{arch}-macos{abi_suffix}-gnu")
             }
         }
         OperatingSystem::Windows => {
@@ -804,7 +806,17 @@ mod tests {
             ),
             // zig 0.10 switched the macOS abi to none
             ("aarch64-apple-darwin", "0.15.2", "aarch64-macos-none"),
+            (
+                "aarch64-apple-darwin.13.0",
+                "0.15.2",
+                "aarch64-macos.13.0-none",
+            ),
             ("aarch64-apple-darwin", "0.9.1", "aarch64-macos-gnu"),
+            (
+                "aarch64-apple-darwin.10.15",
+                "0.9.1",
+                "aarch64-macos.10.15-gnu",
+            ),
             (
                 "aarch64-apple-ios-macabi",
                 "0.15.2",
